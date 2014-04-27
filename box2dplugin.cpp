@@ -44,6 +44,7 @@
 #include "box2dgearjoint.h"
 #include "box2dropejoint.h"
 #include "box2dcontact.h"
+#include "box2draycast.h"
 
 Box2DPlugin::Box2DPlugin(QObject *parent) :
     QQmlExtensionPlugin(parent)
@@ -55,6 +56,8 @@ void Box2DPlugin::registerTypes(const char *uri)
     Q_ASSERT(QLatin1String(uri) == QLatin1String("Box2D"));
 
     qmlRegisterType<Box2DWorld>(uri, 1, 1, "World");
+    qmlRegisterUncreatableType<Box2DProfile>(uri, 1, 1, "Profile",
+                                             QStringLiteral("Property group of World"));
     qmlRegisterType<Box2DBody>(uri, 1, 1, "Body");
     qmlRegisterUncreatableType<Box2DFixture>(uri, 1,0, "Fixture",
                                              QStringLiteral("Base type for Box, Circle etc."));
@@ -77,6 +80,7 @@ void Box2DPlugin::registerTypes(const char *uri)
     qmlRegisterType<Box2DMouseJoint>(uri, 1, 1, "MouseJoint");
     qmlRegisterType<Box2DGearJoint>(uri, 1, 1, "GearJoint");
     qmlRegisterType<Box2DRopeJoint>(uri, 1, 1, "RopeJoint");
+    qmlRegisterType<Box2DRayCast>(uri, 1, 1, "RayCast");
 
     qmlRegisterUncreatableType<Box2DContact>(uri, 1,0, "Contact",QStringLiteral("Contact class"));
 }

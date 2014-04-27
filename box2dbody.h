@@ -37,9 +37,6 @@
 class Box2DFixture;
 class Box2DWorld;
 
-class b2Body;
-class b2World;
-
 /**
  * The Box2D body, build up from a list of shapes.
  */
@@ -106,11 +103,12 @@ public:
 
     QQmlListProperty<Box2DFixture> fixtures();
 
-    void initialize(b2World *world);
+    void initialize(Box2DWorld *world);
     void synchronize();
     void nullifyBody();
 
-    Q_INVOKABLE void applyForce(const QPointF &force,const QPointF &point);
+    Q_INVOKABLE void applyForce(const QPointF &force, const QPointF &point);
+    Q_INVOKABLE void applyForceToCenter(const QPointF &force);
     Q_INVOKABLE void applyTorque(qreal torque);
     Q_INVOKABLE void applyLinearImpulse(const QPointF &impulse, const QPointF &point);
     Q_INVOKABLE void applyAngularImpulse(qreal impulse);
@@ -124,10 +122,11 @@ public:
 
     void componentComplete();
     b2Body *body() const;
-    b2World *world() const;
+    Box2DWorld *world() const;
 
 protected:
     void geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry);
+    void itemChange(ItemChange change, const ItemChangeData &value);
 
 signals:
     void linearDampingChanged();
@@ -140,14 +139,11 @@ signals:
     void angularVelocityChanged();
     void bodyCreated();
     void gravityScaleChanged();
-    void positionChanged(const QPointF &position);
-
-private slots:
-    void onRotationChanged();
+    void positionChanged();
 
 private:
     b2Body *mBody;
-    b2World *mWorld;
+    Box2DWorld *mWorld;
     b2BodyDef mBodyDef;
     bool mSynchronizing;
     bool mInitializePending;
@@ -202,6 +198,24 @@ inline float Box2DBody::gravityScale() const
 inline void Box2DBody::nullifyBody()
 {
     mBody = 0;
+}
+
+inline b2Body *Box2DBody::body() const
+{
+    return mBody;
+}
+
+inline Box2DWorld *Box2DBody::world() const
+{
+    return mWorld;
+}
+
+/**
+ * Convenience function to get the Box2DBody wrapping a b2Body.
+ */
+inline Box2DBody *toBox2DBody(b2Body *body)
+{
+    return static_cast<Box2DBody*>(body->GetUserData());
 }
 
 #endif // BOX2DBODY_H

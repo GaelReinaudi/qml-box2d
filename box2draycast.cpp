@@ -1,7 +1,6 @@
 /*
- * box2ddestructionlistener.cpp
- * Copyright (c) 2011 Joonas Erkinheimo <joonas.erkinheimo@nokia.com>
- * Copyright (c) 2011 Thorbjørn Lindeijer <thorbjorn@lindeijer.nl>
+ * box2draycast.cpp
+ * Copyright (c) 2014 Moukhlynin Ruslan <ruslan@khvmntk.ru>
  *
  * This file is part of the Box2D QML plugin.
  *
@@ -24,25 +23,28 @@
  * 3. This notice may not be removed or altered from any source distribution.
  */
 
-#include "box2ddestructionlistener.h"
+#include "box2draycast.h"
 
-#include "box2djoint.h"
 #include "box2dfixture.h"
 
-Box2DDestructionListener::Box2DDestructionListener(QObject *parent) :
-    QObject(parent)
+
+Box2DRayCast::Box2DRayCast(QObject *parent) :
+    QObject(parent),
+    mMaxFraction(-1.0f)
 {
 }
 
-void Box2DDestructionListener::SayGoodbye(b2Joint *joint)
+float32 Box2DRayCast::ReportFixture(b2Fixture *fixture,
+                                    const b2Vec2 &point,
+                                    const b2Vec2 &normal,
+                                    float32 fraction)
 {
-    if (Box2DJoint *temp = toBox2DJoint(joint)) {
-        temp->nullifyJoint();
-        delete temp;
-    }
-}
+    mMaxFraction = -1.0f;
 
-void Box2DDestructionListener::SayGoodbye(b2Fixture *fixture)
-{
-    emit fixtureDestroyed(toBox2DFixture(fixture));
+    emit fixtureReported(toBox2DFixture(fixture),
+                         toPixels(point),
+                         toPixels(normal),
+                         fraction);
+
+    return mMaxFraction;
 }

@@ -1,6 +1,6 @@
 /*
- * box2ddestructionlistener.h
- * Copyright (c) 2011 Joonas Erkinheimo <joonas.erkinheimo@nokia.com>
+ * box2draycast.h
+ * Copyright (c) 2014 Moukhlynin Ruslan <ruslan@khvmntk.ru>
  *
  * This file is part of the Box2D QML plugin.
  *
@@ -23,27 +23,51 @@
  * 3. This notice may not be removed or altered from any source distribution.
  */
 
-#ifndef BOX2DDESTRUCTIONLISTENER_H
-#define BOX2DDESTRUCTIONLISTENER_H
+#ifndef BOX2DRAYCAST_H
+#define BOX2DRAYCAST_H
 
 #include <QObject>
+#include <QPointF>
+
 #include <Box2D.h>
 
 class Box2DFixture;
 
-class Box2DDestructionListener : public QObject, public b2DestructionListener
+class Box2DRayCast : public QObject, public b2RayCastCallback
 {
     Q_OBJECT
 
+    Q_PROPERTY(float maxFraction READ maxFraction WRITE setMaxFraction)
+
 public:
-    explicit Box2DDestructionListener(QObject *parent = 0);
+    Box2DRayCast(QObject *parent = 0);
 
-    void SayGoodbye(b2Joint *joint);
+    float32 ReportFixture(b2Fixture *fixture,
+                          const b2Vec2 &point,
+                          const b2Vec2 &normal,
+                          float32 fraction);
 
-    void SayGoodbye(b2Fixture *fixture);
+    float maxFraction() const;
+    void setMaxFraction(float maxFraction);
 
 signals:
-    void fixtureDestroyed(Box2DFixture *fixture);
+    void fixtureReported(Box2DFixture *fixture,
+                         const QPointF &point,
+                         const QPointF &normal,
+                         qreal fraction);
+
+private:
+    float mMaxFraction;
 };
 
-#endif // BOX2DDESTRUCTIONLISTENER_H
+inline float Box2DRayCast::maxFraction() const
+{
+    return mMaxFraction;
+}
+
+inline void Box2DRayCast::setMaxFraction(float maxFraction)
+{
+    mMaxFraction = maxFraction;
+}
+
+#endif // BOX2DRAYCAST_H
