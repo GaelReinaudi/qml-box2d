@@ -28,21 +28,42 @@
 #ifndef BOX2DWORLD_H
 #define BOX2DWORLD_H
 
+#include <QAbstractAnimation>
 #include <QQuickItem>
-#include <QList>
-#include <QBasicTimer>
 
-class Box2DBody;
+class Box2DContact;
 class Box2DFixture;
 class Box2DJoint;
+class Box2DWorld;
 class ContactListener;
 class Box2DDestructionListener;
+class StepDriver;
 
 class b2World;
 
 // TODO: Maybe turn this into a property of the world, though it can't be
 // changed dynamically.
 static const float scaleRatio = 32.0f; // 32 pixels in one meter
+
+/**
+ * Small utility class to synchronize the stepping with the framerate.
+ */
+class StepDriver : public QAbstractAnimation
+{
+    Q_OBJECT
+
+public:
+    explicit StepDriver(Box2DWorld *world);
+
+    int duration() const;
+
+protected:
+    void updateCurrentTime(int);
+
+private:
+    Box2DWorld *mWorld;
+};
+
 
 /**
  * Wrapper class around a Box2D world.
@@ -54,7 +75,6 @@ class Box2DWorld : public QQuickItem
     Q_PROPERTY(float timeStep READ timeStep WRITE setTimeStep)
     Q_PROPERTY(int velocityIterations READ velocityIterations WRITE setVelocityIterations)
     Q_PROPERTY(int positionIterations READ positionIterations WRITE setPositionIterations)
-    Q_PROPERTY(int frameTime READ frameTime WRITE setFrameTime)
     Q_PROPERTY(QPointF gravity READ gravity WRITE setGravity NOTIFY gravityChanged)
 
 public:
@@ -73,7 +93,7 @@ public:
 
     /**
      * The number of velocity iterations used to process one step.
-     * 10 by default.
+     * 8 by default.
      */
     int velocityIterations() const
     { return mVelocityIterations; }
@@ -84,7 +104,7 @@ public:
 
     /**
      * The number of position iterations used to process one step.
-     * 10 by default.
+     * 3 by default.
      */
     int positionIterations() const
     { return mPositionIterations; }
@@ -92,36 +112,29 @@ public:
     void setPositionIterations(int iterations)
     { mPositionIterations = iterations; }
 
-    /**
-     * The amount of time each frame takes in milliseconds.
-     * By default it is 1000 / 60.
-     */
-    int frameTime() const { return mFrameTime; }
-    void setFrameTime(int frameTime) { mFrameTime = frameTime; }
-
     QPointF gravity() const { return mGravity; }
     void setGravity(const QPointF &gravity);
 
     void componentComplete();
 
-    void registerBody(Box2DBody *body);
-
     b2World *world() const { return mWorld; }
 
+    void step();
+
 private slots:
-    void unregisterBody();
     void fixtureDestroyed(Box2DFixture *fixture);
 
 signals:
+    void initialized();
+    void preSolve(Box2DContact * contact);
+    void postSolve(Box2DContact * contact);
     void gravityChanged();
     void runningChanged();
     void stepped();
-    void initialized();
 
 protected:
-    void timerEvent(QTimerEvent *);
     void itemChange(ItemChange, const ItemChangeData &);
-    void GetAllBodies(QQuickItem * parent, QList<Box2DBody *> &list);
+    void initializeBodies(QQuickItem *parent);
 
 private:
     b2World *mWorld;
@@ -130,11 +143,9 @@ private:
     float mTimeStep;
     int mVelocityIterations;
     int mPositionIterations;
-    int mFrameTime;
     QPointF mGravity;
     bool mIsRunning;
-    QBasicTimer mTimer;
-    QList<Box2DBody*> mBodies;
+    StepDriver *mStepDriver;
 };
 
 QML_DECLARE_TYPE(Box2DWorld)

@@ -30,14 +30,9 @@
 
 #include <QQuickItem>
 #include <QFlags>
+
 #include <Box2D.h>
 
-#include "box2dfixture.h"
-
-class b2Body;
-class b2Fixture;
-struct b2FixtureDef;
-class b2Shape;
 class Box2DBody;
 
 class Box2DFixture : public QQuickItem
@@ -56,7 +51,6 @@ class Box2DFixture : public QQuickItem
     Q_FLAGS(CategoryFlags)
 
 public:
-
     explicit Box2DFixture(QQuickItem *parent = 0);
 
     enum CategoryFlag {Category1 = 0x0001, Category2 = 0x0002, Category3 = 0x0004, Category4 = 0x0008,
@@ -89,19 +83,9 @@ public:
     void setGroupIndex(int groupIndex);
 
     void createFixture(b2Body *body);
-    virtual void scale(){}
+    virtual void scale() {}
 
-    Q_INVOKABLE Box2DBody * GetBody() const;
-
-protected:
-    b2Fixture *mFixture;
-    b2FixtureDef mFixtureDef;
-    b2Body * mBody;
-    float factorWidth;
-    float factorHeight;
-    virtual b2Shape *createShape() = 0;
-    void geometryChanged(const QRectF & newGeometry, const QRectF & oldGeometry);
-    void applyShape(b2Shape * shape);
+    Q_INVOKABLE Box2DBody *getBody() const;
 
 signals:
     void densityChanged();
@@ -116,17 +100,16 @@ signals:
     void contactChanged(Box2DFixture *other);
     void endContact(Box2DFixture *other);
 
+protected:
+    virtual b2Shape *createShape() = 0;
+    void geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry);
+    void applyShape(b2Shape *shape);
 
-private:
-    friend class Box2DWorld;
-
-    void emitBeginContact(Box2DFixture *other);
-    void emitContactChanged(Box2DFixture *other);
-    void emitEndContact(Box2DFixture *other);
-
-
-
-
+    b2Fixture *mFixture;
+    b2FixtureDef mFixtureDef;
+    b2Body *mBody;
+    float factorWidth;
+    float factorHeight;
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(Box2DFixture::CategoryFlags)
@@ -138,12 +121,12 @@ class Box2DBox : public Box2DFixture
 public:
     explicit Box2DBox(QQuickItem *parent = 0) :
         Box2DFixture(parent)
-    { }
+    {}
+
     void scale();
 
 protected:
     b2Shape *createShape();
-    b2Vec2 vertices[4];
 };
 
 
@@ -163,10 +146,12 @@ public:
         if (mRadius == radius)
             return;
         mRadius = radius;
+        setImplicitSize(mRadius * 2, mRadius * 2);
         scale();
         emit radiusChanged();
     }
     void scale();
+
 signals:
     void radiusChanged();
 
@@ -181,13 +166,18 @@ private:
 class Box2DVerticesShape : public Box2DFixture
 {
     Q_OBJECT
+
     Q_PROPERTY(QVariantList vertices READ vertices WRITE setVertices NOTIFY verticesChanged)
+
 public:
     explicit Box2DVerticesShape(QQuickItem *parent = 0) :
         Box2DFixture(parent)
     { }
+
     QVariantList vertices() const { return mVertices; }
-    void setVertices(const QVariantList &vertices) {
+
+    void setVertices(const QVariantList &vertices)
+    {
         if (vertices == mVertices)
             return;
         mVertices = vertices;
@@ -198,9 +188,9 @@ signals:
 
 protected:
     QVariantList mVertices;
-    b2Vec2 * scaleVertices();
-    virtual b2Shape *createShape(){ return NULL; }
+    b2Vec2 *scaleVertices();
 };
+
 
 class Box2DPolygon : public Box2DVerticesShape
 {
@@ -208,6 +198,7 @@ public:
     explicit Box2DPolygon(QQuickItem *parent = 0) :
         Box2DVerticesShape(parent)
     { }
+
     void scale();
 
 protected:
@@ -218,9 +209,11 @@ protected:
 class Box2DChain : public Box2DVerticesShape
 {
     Q_OBJECT
+
     Q_PROPERTY(bool loop READ loop WRITE setLoop NOTIFY loopChanged)
     Q_PROPERTY(QPointF prevVertex READ prevVertex WRITE setPrevVertex NOTIFY prevVertexChanged)
     Q_PROPERTY(QPointF nextVertex READ nextVertex WRITE setNextVertex NOTIFY nextVertexChanged)
+
 public:
     explicit Box2DChain(QQuickItem *parent = 0) :
         Box2DVerticesShape(parent),
@@ -243,18 +236,22 @@ public:
         nextVertexFlag = true;
     }
 
+signals:
+    void loopChanged();
+    void prevVertexChanged();
+    void nextVertexChanged();
+
 protected:
     b2Shape *createShape();
+
+private:
     bool mLoop;
     bool prevVertexFlag;
     bool nextVertexFlag;
     QPointF mPrevVertex;
     QPointF mNextVertex;
-signals:
-    void loopChanged();
-    void prevVertexChanged();
-    void nextVertexChanged();
 };
+
 
 class Box2DEdge : public Box2DVerticesShape
 {
@@ -267,7 +264,6 @@ public:
 
 protected:
     b2Shape *createShape();
-
 };
 
 /**

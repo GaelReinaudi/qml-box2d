@@ -26,14 +26,16 @@
  */
 
 #include "box2dfixture.h"
+
 #include "box2dworld.h"
+
 #include <QDebug>
+
 #include "Common/b2Math.h"
 
 Box2DFixture::Box2DFixture(QQuickItem *parent) :
     QQuickItem(parent),
     mFixture(0),
-    mFixtureDef(),
     factorWidth(1.0),
     factorHeight(1.0)
 {
@@ -114,6 +116,9 @@ void Box2DFixture::setCategories(CategoryFlags layers)
         return;
 
     mFixtureDef.filter.categoryBits = layers;
+    if (mFixture)
+        mFixture->SetFilterData(mFixtureDef.filter);
+
     emit categoriesChanged();
 }
 
@@ -128,6 +133,9 @@ void Box2DFixture::setCollidesWith(CategoryFlags layers)
         return;
 
     mFixtureDef.filter.maskBits = layers;
+    if (mFixture)
+        mFixture->SetFilterData(mFixtureDef.filter);
+
     emit collidesWithChanged();
 }
 
@@ -142,6 +150,9 @@ void Box2DFixture::setGroupIndex(int groupIndex)
         return;
 
     mFixtureDef.filter.groupIndex = groupIndex;
+    if (mFixture)
+        mFixture->SetFilterData(mFixtureDef.filter);
+
     emit groupIndexChanged();
 }
 
@@ -158,46 +169,34 @@ void Box2DFixture::createFixture(b2Body *body)
     delete shape;
 }
 
-Box2DBody *Box2DFixture::GetBody() const
+Box2DBody *Box2DFixture::getBody() const
 {
     return static_cast<Box2DBody *>(mBody->GetUserData());
 }
 
 void Box2DFixture::geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry)
 {
-    if(!isComponentComplete()) return;
+    QQuickItem::geometryChanged(newGeometry, oldGeometry);
+
+    if (!isComponentComplete())
+        return;
 
     qreal nw = newGeometry.width();
     qreal nh = newGeometry.height();
     qreal ow = oldGeometry.width();
     qreal oh = oldGeometry.height();
 
-    if( (nw != ow && !qFuzzyCompare(ow,0.0)) ||  (nh != oh && !qFuzzyCompare(oh,0.0)) )
-    {
+    if (!qFuzzyCompare(ow, 0.0) && !qFuzzyCompare(oh, 0.0) && newGeometry != oldGeometry) {
         factorWidth = nw / ow;
         factorHeight = nh / oh;
         scale();
     }
 }
 
-void Box2DFixture::emitBeginContact(Box2DFixture *other)
-{
-    emit beginContact(other);
-}
-
-void Box2DFixture::emitContactChanged(Box2DFixture *other)
-{
-    emit contactChanged(other);
-}
-
-void Box2DFixture::emitEndContact(Box2DFixture *other)
-{
-    emit endContact(other);
-}
-
 void Box2DFixture::applyShape(b2Shape *shape)
 {
-    if(mFixture) mBody->DestroyFixture(mFixture);
+    if (mFixture)
+        mBody->DestroyFixture(mFixture);
     mFixtureDef.shape = shape;
     mFixture = mBody->CreateFixture(&mFixtureDef);
     mFixture->SetUserData(this);
@@ -207,13 +206,12 @@ void Box2DFixture::applyShape(b2Shape *shape)
 b2Vec2 *Box2DVerticesShape::scaleVertices()
 {
     const int count = mVertices.length();
-    b2Vec2 * vertices = new b2Vec2[count];
+    b2Vec2 *vertices = new b2Vec2[count];
     for (int i = 0; i < count; ++i) {
-
         QPointF point = mVertices.at(i).toPointF();
         point.setX(point.x() * factorWidth);
         point.setY(point.y() * factorHeight);
-        mVertices.replace(i,point);
+        mVertices.replace(i, point);
         vertices[i].Set(point.x() / scaleRatio, -point.y() / scaleRatio);
     }
     return vertices;
@@ -223,38 +221,23 @@ b2Vec2 *Box2DVerticesShape::scaleVertices()
 
 b2Shape *Box2DBox::createShape()
 {
-    const qreal _x = x() / scaleRatio;
-    const qreal _y = -y() / scaleRatio;
-    const qreal _width = width() / scaleRatio;
-    const qreal _height = height() / scaleRatio;
+    const qreal _halfWidth = width() / scaleRatio / 2;
+    const qreal _halfHeight = height() / scaleRatio / 2;
+    const qreal _centerX = x() / scaleRatio + _halfWidth;
+    const qreal _centerY = -y() / scaleRatio - _halfHeight;
 
-    vertices[0].Set(_x, _y);
-    vertices[1].Set(_x , _y - _height);
-    vertices[2].Set(_x + _width , _y - _height);
-    vertices[3].Set(_x + _width , _y );
-    for(int i = 1;i < 4;i ++)
-    {
-        if(i > 0)
-        {
-            if(b2DistanceSquared(vertices[i - 1], vertices[i]) <= b2_linearSlop * b2_linearSlop)
-            {
-                qWarning() << "Box: vertices are too close together";
-                return 0;
-            }
-        }
-    }
-
-    int32 count = 4;
     b2PolygonShape *shape = new b2PolygonShape;
-    shape->Set(vertices, count);
+    shape->SetAsBox(_halfWidth, _halfHeight,
+                    b2Vec2(_centerX, _centerY),
+                    rotation() * b2_pi / -180);
+
     return shape;
 }
 
 void Box2DBox::scale()
 {
-    if(mFixture)
-    {
-        b2Shape * shape = createShape();
+    if (mFixture) {
+        b2Shape *shape = createShape();
         applyShape(shape);
     }
 }
@@ -264,20 +247,18 @@ void Box2DBox::scale()
 b2Shape *Box2DCircle::createShape()
 {
     b2CircleShape *shape = new b2CircleShape;
+
     shape->m_radius = mRadius / scaleRatio;
-    shape->m_p.Set(shape->m_radius, -shape->m_radius);
-    if(height() == 0 || width() == 0) {
-        this->setWidth(shape->m_radius);
-        this->setHeight(shape->m_radius);
-    }
+    shape->m_p.Set(x() / scaleRatio + shape->m_radius,
+                   -y() / scaleRatio - shape->m_radius);
+
     return shape;
 }
 
 void Box2DCircle::scale()
 {
-    if(mFixture)
-    {
-        b2Shape * shape = createShape();
+    if (mFixture) {
+        b2Shape *shape = createShape();
         applyShape(shape);
     }
 }
@@ -292,14 +273,14 @@ b2Shape *Box2DPolygon::createShape()
         return 0;
     }
 
-    b2Vec2 *vertices = new b2Vec2[count];
+    QScopedArrayPointer<b2Vec2> vertices(new b2Vec2[count]);
+
     for (int i = 0; i < count; ++i) {
         const QPointF &point = mVertices.at(i).toPointF();
         vertices[i].Set(point.x() / scaleRatio, -point.y() / scaleRatio);
-        if(i > 0)
-        {
-            if(b2DistanceSquared(vertices[i - 1], vertices[i]) <= b2_linearSlop * b2_linearSlop)
-            {
+
+        if (i > 0) {
+            if (b2DistanceSquared(vertices[i - 1], vertices[i]) <= b2_linearSlop * b2_linearSlop) {
                 qWarning() << "Polygon: vertices are too close together";
                 return 0;
             }
@@ -307,22 +288,20 @@ b2Shape *Box2DPolygon::createShape()
     }
 
     b2PolygonShape *shape = new b2PolygonShape;
-    shape->Set(vertices, count);
-    delete[] vertices;
+    shape->Set(vertices.data(), count);
+
     return shape;
 }
 
 void Box2DPolygon::scale()
 {
-    if(mFixture)
-    {
+    if (mFixture) {
         b2Vec2 *vertices = scaleVertices();
         b2PolygonShape *shape = new b2PolygonShape;
         shape->Set(vertices, mVertices.count());
         delete[] vertices;
         applyShape(shape);
     }
-
 }
 
 //=================== CHAIN =======================
@@ -330,18 +309,20 @@ void Box2DPolygon::scale()
 b2Shape *Box2DChain::createShape()
 {
     const int count = mVertices.length();
-    if (count < 2) {
+
+    if (count < 2 || (mLoop && count < 3)) {
         qWarning() << "Chain: Invalid number of vertices:" << count;
         return 0;
     }
 
-    b2Vec2 *vertices = new b2Vec2[count];
+    QScopedArrayPointer<b2Vec2> vertices(new b2Vec2[count]);
+
     for (int i = 0; i < count; ++i) {
         const QPointF &point = mVertices.at(i).toPointF();
         vertices[i].Set(point.x() / scaleRatio, -point.y() / scaleRatio);
-        if(i > 0) {
-            if(b2DistanceSquared(vertices[i - 1], vertices[i]) <= b2_linearSlop * b2_linearSlop)
-            {
+
+        if (i > 0) {
+            if (b2DistanceSquared(vertices[i - 1], vertices[i]) <= b2_linearSlop * b2_linearSlop) {
                 qWarning() << "Chain: vertices are too close together";
                 return 0;
             }
@@ -349,22 +330,31 @@ b2Shape *Box2DChain::createShape()
     }
 
     b2ChainShape *shape = new b2ChainShape;
-    if(mLoop) shape->CreateLoop(vertices, count);
-    else shape->CreateChain(vertices, count);
-    if(prevVertexFlag) shape->SetPrevVertex(b2Vec2(mPrevVertex.x() / scaleRatio,mPrevVertex.y() / scaleRatio));
-    if(nextVertexFlag) shape->SetNextVertex(b2Vec2(mNextVertex.x() / scaleRatio,mNextVertex.y() / scaleRatio));
-    delete[] vertices;
+    if (mLoop) {
+        shape->CreateLoop(vertices.data(), count);
+    } else {
+        shape->CreateChain(vertices.data(), count);
+
+        if (prevVertexFlag)
+            shape->SetPrevVertex(b2Vec2(mPrevVertex.x() / scaleRatio,
+                                        -mPrevVertex.y() / scaleRatio));
+        if (nextVertexFlag)
+            shape->SetNextVertex(b2Vec2(mNextVertex.x() / scaleRatio,
+                                        -mNextVertex.y() / scaleRatio));
+    }
+
     return shape;
 }
 
 void Box2DChain::scale()
 {
-    if(mFixture)
-    {
+    if (mFixture) {
         b2Vec2 *vertices = scaleVertices();
         b2ChainShape *shape = new b2ChainShape;
-        if(mLoop) shape->CreateLoop(vertices, mVertices.count());
-        else shape->CreateChain(vertices, mVertices.count());
+        if (mLoop)
+            shape->CreateLoop(vertices, mVertices.count());
+        else
+            shape->CreateChain(vertices, mVertices.count());
         delete[] vertices;
         applyShape(shape);
     }
@@ -383,24 +373,22 @@ b2Shape *Box2DEdge::createShape()
     QPointF point2 = mVertices.at(1).toPointF();
     b2Vec2 vertex1(point1.x() / scaleRatio, -point1.y() / scaleRatio);
     b2Vec2 vertex2(point2.x() / scaleRatio, -point2.y() / scaleRatio);
-    if(b2DistanceSquared(vertex1, vertex2) <= b2_linearSlop * b2_linearSlop)
-    {
+    if (b2DistanceSquared(vertex1, vertex2) <= b2_linearSlop * b2_linearSlop) {
         qWarning() << "Edge: vertices are too close together";
         return 0;
     }
     b2EdgeShape *shape = new b2EdgeShape;
-    shape->Set(vertex1,vertex2);
+    shape->Set(vertex1, vertex2);
 
     return shape;
 }
 
 void Box2DEdge::scale()
 {
-    if(mFixture)
-    {
+    if (mFixture) {
         b2Vec2 *vertices = scaleVertices();
         b2EdgeShape *shape = new b2EdgeShape;
-        shape->Set(vertices[0],vertices[1]);
+        shape->Set(vertices[0], vertices[1]);
         delete[] vertices;
         applyShape(shape);
     }

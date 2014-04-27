@@ -28,13 +28,30 @@
 #include "box2dworld.h"
 
 #include "box2dbody.h"
+#include "box2dcontact.h"
 #include "box2dfixture.h"
 #include "box2djoint.h"
 #include "box2ddestructionlistener.h"
 
-#include <QTimerEvent>
-
 #include <Box2D.h>
+
+StepDriver::StepDriver(Box2DWorld *world)
+    : QAbstractAnimation(world)
+    , mWorld(world)
+{
+    setLoopCount(-1); // loop forever
+}
+
+int StepDriver::duration() const
+{
+    return 1000;
+}
+
+void StepDriver::updateCurrentTime(int)
+{
+    mWorld->step();
+}
+
 
 class ContactEvent
 {
@@ -52,8 +69,11 @@ public:
 class ContactListener : public b2ContactListener
 {
 public:
+    explicit ContactListener(Box2DWorld *world);
     void BeginContact(b2Contact *contact);
     void EndContact(b2Contact *contact);
+    void PreSolve(b2Contact *contact, const b2Manifold *oldManifold);
+    void PostSolve(b2Contact *contact, const b2ContactImpulse *impulse);
 
     void removeEvent(int index) { mEvents.removeAt(index); }
     void clearEvents() { mEvents.clear(); }
@@ -61,7 +81,14 @@ public:
 
 private:
     QList<ContactEvent> mEvents;
+    Box2DWorld *mWorld;
+    Box2DContact mContact;
 };
+
+ContactListener::ContactListener(Box2DWorld *world) :
+    mWorld(world)
+{
+}
 
 void ContactListener::BeginContact(b2Contact *contact)
 {
@@ -81,18 +108,32 @@ void ContactListener::EndContact(b2Contact *contact)
     mEvents.append(event);
 }
 
+void ContactListener::PreSolve(b2Contact *contact, const b2Manifold *oldManifold)
+{
+    Q_UNUSED(oldManifold)
+    mContact.setContact(contact);
+    emit mWorld->preSolve(&mContact);
+}
+
+void ContactListener::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse)
+{
+    Q_UNUSED(impulse)
+    mContact.setContact(contact);
+    emit mWorld->postSolve(&mContact);
+}
+
 
 Box2DWorld::Box2DWorld(QQuickItem *parent) :
     QQuickItem(parent),
     mWorld(0),
-    mContactListener(new ContactListener),
+    mContactListener(new ContactListener(this)),
     mDestructionListener(new Box2DDestructionListener),
     mTimeStep(1.0f / 60.0f),
-    mVelocityIterations(10),
-    mPositionIterations(10),
-    mFrameTime(1000 / 60),
+    mVelocityIterations(8),
+    mPositionIterations(3),
     mGravity(qreal(0), qreal(10)),
-    mIsRunning(true)
+    mIsRunning(true),
+    mStepDriver(new StepDriver(this))
 {
     connect(mDestructionListener, SIGNAL(fixtureDestroyed(Box2DFixture*)),
             this, SLOT(fixtureDestroyed(Box2DFixture*)));
@@ -100,16 +141,10 @@ Box2DWorld::Box2DWorld(QQuickItem *parent) :
 
 Box2DWorld::~Box2DWorld()
 {
-    // Bodies must be deleted before the world
-    foreach (Box2DBody *body, mBodies)
-    {
-        if(body->parent() == this)
-            delete body;
-        else
-            body->cleanup(this->world());
-
-    }
-    mBodies.clear();
+    // The bodies will be deleted as part of the world, so it's important
+    // that they are no longer referenced from the Box2DBody instances.
+    for (b2Body *body = mWorld->GetBodyList(); body; body = body->GetNext())
+        static_cast<Box2DBody *>(body->GetUserData())->nullifyBody();
 
     delete mWorld;
     delete mContactListener;
@@ -126,9 +161,9 @@ void Box2DWorld::setRunning(bool running)
 
     if (isComponentComplete()) {
         if (running)
-            mTimer.start(mFrameTime, this);
+            mStepDriver->start();
         else
-            mTimer.stop();
+            mStepDriver->stop();
     }
 }
 
@@ -154,38 +189,11 @@ void Box2DWorld::componentComplete()
     mWorld->SetContactListener(mContactListener);
     mWorld->SetDestructionListener(mDestructionListener);
 
-    QList<Box2DBody *> list;
-    GetAllBodies(this,list);
-    foreach(Box2DBody * body,list)
-    {
-        registerBody(body);
-    }
+    initializeBodies(this);
 
     emit initialized();
     if (mIsRunning)
-        mTimer.start(mFrameTime, this);
-
-}
-
-/**
- * Registers a Box2D body with this world. When the world component is
- * complete, it will initialize the body.
- */
-void Box2DWorld::registerBody(Box2DBody *body)
-{
-    mBodies.append(body);
-    body->initialize(mWorld);
-    connect(body, SIGNAL(destroyed()), this, SLOT(unregisterBody()));
-}
-
-/**
- * Unregisters a Box2D body from this world. Called when a dynamically
- * created Box2D body has been deleted.
- */
-void Box2DWorld::unregisterBody()
-{
-    Box2DBody *body = static_cast<Box2DBody*>(sender());
-    mBodies.removeOne(body);
+        mStepDriver->start();
 }
 
 void Box2DWorld::fixtureDestroyed(Box2DFixture *fixture)
@@ -198,69 +206,62 @@ void Box2DWorld::fixtureDestroyed(Box2DFixture *fixture)
     }
 }
 
-void Box2DWorld::timerEvent(QTimerEvent *event)
+void Box2DWorld::step()
 {
-    if (event->timerId() == mTimer.timerId()) {
-        mWorld->Step(mTimeStep, mVelocityIterations, mPositionIterations);
-        foreach (Box2DBody *body, mBodies)
-            body->synchronize();
+    mWorld->Step(mTimeStep, mVelocityIterations, mPositionIterations);
 
-        // Emit contact signals
-        foreach (const ContactEvent &event, mContactListener->events()) {
-            switch (event.type) {
-            case ContactEvent::BeginContact:
-                event.fixtureA->emitBeginContact(event.fixtureB);
-                event.fixtureB->emitBeginContact(event.fixtureA);
-                break;
-            case ContactEvent::EndContact:
-                event.fixtureA->emitEndContact(event.fixtureB);
-                event.fixtureB->emitEndContact(event.fixtureA);
-                break;
-            }
+    for (b2Body *body = mWorld->GetBodyList(); body; body = body->GetNext())
+        static_cast<Box2DBody *>(body->GetUserData())->synchronize();
+
+    // Emit contact signals
+    foreach (const ContactEvent &event, mContactListener->events()) {
+        switch (event.type) {
+        case ContactEvent::BeginContact:
+            emit event.fixtureA->beginContact(event.fixtureB);
+            emit event.fixtureB->beginContact(event.fixtureA);
+            break;
+        case ContactEvent::EndContact:
+            emit event.fixtureA->endContact(event.fixtureB);
+            emit event.fixtureB->endContact(event.fixtureA);
+            break;
         }
-        mContactListener->clearEvents();
+    }
+    mContactListener->clearEvents();
 
-        // Emit signals for the current state of the contacts
-        b2Contact *contact = mWorld->GetContactList();
-        while (contact) {
-            Box2DFixture *fixtureA = toBox2DFixture(contact->GetFixtureA());
-            Box2DFixture *fixtureB = toBox2DFixture(contact->GetFixtureB());
+    // Emit signals for the current state of the contacts
+    b2Contact *contact = mWorld->GetContactList();
+    while (contact) {
+        Box2DFixture *fixtureA = toBox2DFixture(contact->GetFixtureA());
+        Box2DFixture *fixtureB = toBox2DFixture(contact->GetFixtureB());
 
-            fixtureA->emitContactChanged(fixtureB);
-            fixtureB->emitContactChanged(fixtureA);
+        emit fixtureA->contactChanged(fixtureB);
+        emit fixtureB->contactChanged(fixtureA);
 
-            contact = contact->GetNext();
-        }
-
-        emit stepped();
+        contact = contact->GetNext();
     }
 
-    QQuickItem::timerEvent(event);
+    emit stepped();
 }
 
-void Box2DWorld::itemChange(ItemChange change,
-                                const ItemChangeData &value)
+void Box2DWorld::itemChange(ItemChange change, const ItemChangeData &value)
 {
     if (isComponentComplete()) {
         if (change == ItemChildAddedChange) {
             QObject *child = value.item;
-            if (Box2DBody *body = dynamic_cast<Box2DBody*>(child)) {
-                registerBody(body);
-            }
+            if (Box2DBody *body = dynamic_cast<Box2DBody*>(child))
+                body->initialize(mWorld);
         }
     }
 
     QQuickItem::itemChange(change, value);
 }
 
-// Get all Box2DBodies attached to this world
-void Box2DWorld::GetAllBodies(QQuickItem *parent, QList<Box2DBody *> & list)
+void Box2DWorld::initializeBodies(QQuickItem *parent)
 {
-    QList<QQuickItem *> children = parent->childItems();
-    foreach(QQuickItem * item,children)
-    {
-        Box2DBody * body = dynamic_cast<Box2DBody *>(item);
-        if(body) list.append(body);
-        GetAllBodies(item,list);
+    foreach (QQuickItem *item, parent->childItems()) {
+        if (Box2DBody *body = dynamic_cast<Box2DBody *>(item))
+            body->initialize(mWorld);
+
+        initializeBodies(item);
     }
 }
