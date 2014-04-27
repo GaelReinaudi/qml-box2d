@@ -29,40 +29,35 @@
 #include "box2djoint.h"
 #include <Box2D.h>
 
-class b2World;
-class b2GearJoint;
-class b2GearJointDef;
-
 class Box2DGearJoint : public Box2DJoint
 {
     Q_OBJECT
 
-    Q_PROPERTY(Box2DJoint * joint1 READ joint1 WRITE setJoint1 NOTIFY joint1Changed)
-    Q_PROPERTY(Box2DJoint * joint2 READ joint2 WRITE setJoint2 NOTIFY joint2Changed)
+    Q_PROPERTY(Box2DJoint *joint1 READ joint1 WRITE setJoint1 NOTIFY joint1Changed)
+    Q_PROPERTY(Box2DJoint *joint2 READ joint2 WRITE setJoint2 NOTIFY joint2Changed)
     Q_PROPERTY(float ratio READ ratio WRITE setRatio NOTIFY ratioChanged)
 
 public:
     explicit Box2DGearJoint(QObject *parent = 0);
-    ~Box2DGearJoint();
 
     float ratio() const;
-    void setRatio(float _ratio);
+    void setRatio(float ratio);
 
     Box2DJoint *joint1() const;
-    void setJoint1(Box2DJoint *_joint1);
+    void setJoint1(Box2DJoint *joint1);
 
     Box2DJoint *joint2() const;
-    void setJoint2(Box2DJoint *_joint2);
+    void setJoint2(Box2DJoint *joint2);
 
-    void nullifyJoint();
-    void createJoint();
-    void cleanup(b2World *world);
-    b2Joint * GetJoint();
+    b2GearJoint *gearJoint() const;
 
 signals:
     void ratioChanged();
     void joint1Changed();
     void joint2Changed();
+
+protected:
+    b2Joint *createJoint();
 
 private slots:
     void joint1Created();
@@ -70,9 +65,28 @@ private slots:
 
 private:
     b2GearJointDef mGearJointDef;
-    b2GearJoint *mGearJoint;
+    Box2DJoint *mJoint1;
+    Box2DJoint *mJoint2;
 };
 
+inline float Box2DGearJoint::ratio() const
+{
+    return mGearJointDef.ratio;
+}
 
+inline Box2DJoint *Box2DGearJoint::joint1() const
+{
+    return mJoint1;
+}
+
+inline Box2DJoint *Box2DGearJoint::joint2() const
+{
+    return mJoint2;
+}
+
+inline b2GearJoint *Box2DGearJoint::gearJoint() const
+{
+    return static_cast<b2GearJoint*>(joint());
+}
 
 #endif // BOX2DGEARJOINT_H

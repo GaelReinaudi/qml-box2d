@@ -30,108 +30,64 @@
 #include "box2dbody.h"
 
 Box2DRopeJoint::Box2DRopeJoint(QObject *parent) :
-    Box2DJoint(parent),
-    mRopeJointDef(),
-    mRopeJoint(0)
+    Box2DJoint(mRopeJointDef, parent)
 {
-}
-
-Box2DRopeJoint::~Box2DRopeJoint()
-{
-    cleanup(world());
 }
 
 float Box2DRopeJoint::maxLength() const
 {
-    if(mRopeJoint) return mRopeJoint->GetMaxLength() * scaleRatio;
-    return mRopeJointDef.maxLength * scaleRatio;
+    return world()->toPixels(mRopeJointDef.maxLength);
 }
 
-void Box2DRopeJoint::setMaxLength(float _maxLength)
+void Box2DRopeJoint::setMaxLength(float maxLength)
 {
-    if(qFuzzyCompare(maxLength(),_maxLength))
+    const float maxLengthMeters = world()->toMeters(maxLength);
+    if (mRopeJointDef.maxLength == maxLengthMeters)
         return;
 
-    mRopeJointDef.maxLength = _maxLength / scaleRatio;
-    if(mRopeJoint)
-        mRopeJoint->SetMaxLength(mRopeJointDef.maxLength);
-
+    mRopeJointDef.maxLength = maxLengthMeters;
+    if (ropeJoint())
+        ropeJoint()->SetMaxLength(maxLengthMeters);
     emit maxLengthChanged();
 }
 
 QPointF Box2DRopeJoint::localAnchorA() const
 {
-    return QPointF(mRopeJointDef.localAnchorA.x * scaleRatio,
-                   mRopeJointDef.localAnchorA.y * scaleRatio);
+    return world()->toPixels(mRopeJointDef.localAnchorA);
 }
 
 void Box2DRopeJoint::setLocalAnchorA(const QPointF &localAnchorA)
 {
-    mRopeJointDef.localAnchorA = b2Vec2(localAnchorA.x() / scaleRatio,
-                                        -localAnchorA.y() / scaleRatio);
+    mRopeJointDef.localAnchorA = world()->toMeters(localAnchorA);
     emit localAnchorAChanged();
 }
 
 QPointF Box2DRopeJoint::localAnchorB() const
 {
-    return QPointF(mRopeJointDef.localAnchorB.x * scaleRatio,
-                   mRopeJointDef.localAnchorB.y * scaleRatio);
+    return world()->toPixels(mRopeJointDef.localAnchorB);
 }
 
 void Box2DRopeJoint::setLocalAnchorB(const QPointF &localAnchorB)
 {
-    mRopeJointDef.localAnchorB = b2Vec2(localAnchorB.x() / scaleRatio,
-                                        -localAnchorB.y() / scaleRatio);
+    mRopeJointDef.localAnchorB = world()->toMeters(localAnchorB);
     emit localAnchorBChanged();
 }
 
-void Box2DRopeJoint::nullifyJoint()
+b2Joint *Box2DRopeJoint::createJoint()
 {
-    mRopeJoint = 0;
+    return world()->world().CreateJoint(&mRopeJointDef);
 }
 
-void Box2DRopeJoint::createJoint()
+QPointF Box2DRopeJoint::getReactionForce(float32 inv_dt) const
 {
-    mRopeJointDef.bodyA = bodyA()->body();
-    mRopeJointDef.bodyB = bodyB()->body();
-
-    mRopeJointDef.collideConnected = collideConnected();
-    mRopeJoint = static_cast<b2RopeJoint*>(world()->CreateJoint(&mRopeJointDef));
-    mRopeJoint->SetUserData(this);
-    mInitializePending = false;
-    emit created();
-}
-
-void Box2DRopeJoint::cleanup(b2World *world)
-{
-    if(!world) {
-        qWarning() << "RopeJoint: There is no world connected";
-        return;
-    }
-    if (mRopeJoint && bodyA() && bodyB()) {
-        mRopeJoint->SetUserData(0);
-        world->DestroyJoint(mRopeJoint);
-        mRopeJoint = 0;
-    }
-}
-
-b2Joint *Box2DRopeJoint::GetJoint()
-{
-    return mRopeJoint;
-}
-
-QPointF Box2DRopeJoint::GetReactionForce(float32 inv_dt) const
-{
-    if(mRopeJoint)
-    {
-        b2Vec2 point = mRopeJoint->GetReactionForce(inv_dt);
-        return QPointF(point.x * scaleRatio,point.y * scaleRatio);
-    }
+    if (ropeJoint())
+        return invertY(ropeJoint()->GetReactionForce(inv_dt));
     return QPointF();
 }
 
-float Box2DRopeJoint::GetReactionTorque(float32 inv_dt) const
+float Box2DRopeJoint::getReactionTorque(float32 inv_dt) const
 {
-    if(mRopeJoint) return mRopeJoint->GetReactionTorque(inv_dt);
+    if (ropeJoint())
+        return ropeJoint()->GetReactionTorque(inv_dt);
     return 0.0f;
 }

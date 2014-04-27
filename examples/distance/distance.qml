@@ -13,16 +13,15 @@ Item {
         Body {
             bodyType: Body.Dynamic
 			fixtures: Circle {
+                id: circle
                 radius: 40
                 density: 5
                 friction: 0.3
                 restitution: 0.2
             }
             Rectangle {
-                anchors.centerIn: parent
+                anchors.fill: circle
                 radius: 40
-                width: 80
-                height: 80
                 smooth: true
                 color: "black"
             }
@@ -34,6 +33,7 @@ Item {
         Body {
 			bodyType: Body.Dynamic
             fixtures: Circle {
+                id: circle
                 radius: 40
                 density: 2
                 friction: 0.3
@@ -41,10 +41,8 @@ Item {
             }
 
             Rectangle {
-                anchors.centerIn: parent
+                anchors.fill: circle
                 radius: 40
-                width: 80
-                height: 80
                 smooth: true
                 color: "black"
             }
@@ -75,7 +73,6 @@ Item {
             var joint = extraJoint.createObject(world)
             joint.bodyA = ball
             joint.bodyB = ball2
-            joint.world = world
         }
     }
 
@@ -116,7 +113,7 @@ Item {
 
         Square {
             id: square
-            x: 120
+            x: 180
             y: 120
             rotation: 0
             width: 80
@@ -130,7 +127,6 @@ Item {
             collideConnected: true
             bodyA: ball
             bodyB: square
-            world: world
         }
 
         Body {
@@ -160,8 +156,8 @@ Item {
             anchors.fill: parent
             onClicked: {
                 ball.applyLinearImpulse(
-                            Qt.point(10 * (mouseX - ball.x),
-                                     10 * (mouseY - ball.y)),
+                            Qt.point((mouseX - ball.x),
+                                     (mouseY - ball.y)),
                             Qt.point(ball.x, ball.y))
             }
         }

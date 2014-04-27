@@ -29,10 +29,6 @@
 #include "box2djoint.h"
 #include <Box2D.h>
 
-class b2World;
-class b2DistanceJoint;
-class b2DistanceJointDef;
-
 class Box2DDistanceJoint : public Box2DJoint
 {
     Q_OBJECT
@@ -45,7 +41,6 @@ class Box2DDistanceJoint : public Box2DJoint
 
 public:
     explicit Box2DDistanceJoint(QObject *parent = 0);
-    ~Box2DDistanceJoint();
 
     float length() const;
     void setLength(float length);
@@ -62,13 +57,10 @@ public:
     QPointF localAnchorB() const;
     void setLocalAnchorB(const QPointF &localAnchorB);
 
-    void nullifyJoint();
-    void createJoint();
-    void cleanup(b2World *world);
-    b2Joint * GetJoint();
+    b2DistanceJoint *distanceJoint() const;
 
-    Q_INVOKABLE QPointF GetReactionForce(float32 inv_dt) const;
-    Q_INVOKABLE float GetReactionTorque(float32 inv_dt) const;
+    Q_INVOKABLE QPointF getReactionForce(float32 inv_dt) const;
+    Q_INVOKABLE float getReactionTorque(float32 inv_dt) const;
 
 signals:
     void lengthChanged();
@@ -77,10 +69,27 @@ signals:
     void localAnchorAChanged();
     void localAnchorBChanged();
 
+protected:
+    b2Joint *createJoint();
+
 private:
     b2DistanceJointDef mDistanceJointDef;
-    b2DistanceJoint *mDistanceJoint;
-    bool anchorsAuto;
+    bool mAnchorsAuto;
 };
+
+inline float Box2DDistanceJoint::frequencyHz() const
+{
+    return mDistanceJointDef.frequencyHz;
+}
+
+inline float Box2DDistanceJoint::dampingRatio() const
+{
+    return mDistanceJointDef.dampingRatio;
+}
+
+inline b2DistanceJoint *Box2DDistanceJoint::distanceJoint() const
+{
+    return static_cast<b2DistanceJoint*>(joint());
+}
 
 #endif // BOX2DDISTANCEJOINT_H

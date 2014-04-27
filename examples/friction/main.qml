@@ -6,15 +6,14 @@ Rectangle {
     height: 600
     color: "#EFEFFF"
 
-    Component
-    {
+    Component {
         id: frictionJoint
         FrictionJoint {
             bodyA: anchor
             maxForce: 0.5
             maxTorque: 0.5
-            localAnchorA: Qt.point(10,10)
-            localAnchorB: Qt.point(10,10)
+            localAnchorA: Qt.point(10, 10)
+            localAnchorB: Qt.point(10, 10)
         }
     }
 
@@ -140,17 +139,15 @@ Rectangle {
                 var newBox = boxComponent.createObject(world);
                 newBox.x = world.width / 2;
                 newBox.y = world.height / 2;
-                var x = ((Math.random() * 800) - 400) / 15;
-                var y = ((Math.random() * 600) - 300) / 15;
-                if(Math.round(Math.random() * 5) == 1) {
+                var x = ((Math.random() * 800) - 400) / 200;
+                var y = ((Math.random() * 600) - 300) / 200;
+                if (Math.round(Math.random() * 5) == 1) {
                     newBox.boxColor = "red";
-                }
-                else {
+                } else {
                     var joint = frictionJoint.createObject(world);
-                    joint.world = world;
                     joint.bodyB = newBox;
                 }
-                newBox.applyLinearImpulse(Qt.point(x,y),Qt.point(10,10));
+                newBox.applyLinearImpulse(Qt.point(x,y), Qt.point(10,10));
             }
         }
     }

@@ -29,10 +29,6 @@
 #include "box2djoint.h"
 #include <Box2D.h>
 
-class b2World;
-class b2PrismaticJoint;
-class b2PrismaticJointDef;
-
 class Box2DPrismaticJoint : public Box2DJoint
 {
     Q_OBJECT
@@ -50,7 +46,6 @@ class Box2DPrismaticJoint : public Box2DJoint
 
 public:
     explicit Box2DPrismaticJoint(QObject *parent = 0);
-    ~Box2DPrismaticJoint();
 
     float lowerTranslation() const;
     void setLowerTranslation(float lowerTranslation);
@@ -79,13 +74,10 @@ public:
     QPointF localAnchorB() const;
     void setLocalAnchorB(const QPointF &localAnchorB);
 
-    Q_INVOKABLE float GetJointTranslation();
-    Q_INVOKABLE float GetJointSpeed();
+    Q_INVOKABLE float getJointTranslation() const;
+    Q_INVOKABLE float getJointSpeed() const;
 
-    void nullifyJoint();
-    void createJoint();
-    void cleanup(b2World *world);
-    b2Joint * GetJoint();
+    b2PrismaticJoint *prismaticJoint() const;
 
 signals:
     void lowerTranslationChanged();
@@ -98,12 +90,32 @@ signals:
     void localAnchorAChanged();
     void localAnchorBChanged();
 
+protected:
+    b2Joint *createJoint();
+
 private:
     b2PrismaticJointDef mPrismaticJointDef;
-    b2PrismaticJoint *mPrismaticJoint;
-    bool anchorsAuto;
+    bool mAnchorsAuto;
 };
 
+inline float Box2DPrismaticJoint::maxMotorForce() const
+{
+    return mPrismaticJointDef.maxMotorForce;
+}
 
+inline bool Box2DPrismaticJoint::enableLimit() const
+{
+    return mPrismaticJointDef.enableLimit;
+}
+
+inline bool Box2DPrismaticJoint::enableMotor() const
+{
+    return mPrismaticJointDef.enableMotor;
+}
+
+inline b2PrismaticJoint *Box2DPrismaticJoint::prismaticJoint() const
+{
+    return static_cast<b2PrismaticJoint*>(joint());
+}
 
 #endif // BOX2DPRISMATICJOINT_H

@@ -32,7 +32,6 @@ Rectangle {
     Component {
         id: linkJoint
         RevoluteJoint {
-            world: world
             localAnchorA: Qt.point(10, 30)
             localAnchorB: Qt.point(10, 5)
             collideConnected: true
@@ -123,7 +122,6 @@ Rectangle {
                 var newLink = link.createObject(world);
                 newLink.y = y;
                 var newJoint = linkJoint.createObject(world);
-                newJoint.world = world;
                 newJoint.bodyA = prev;
                 newJoint.bodyB = newLink;
                 prev = newLink;
@@ -225,7 +223,6 @@ Rectangle {
 
         RevoluteJoint {
             id: joint
-            world: world
             bodyA: canonBase
             bodyB: canon
             localAnchorA: Qt.point(75, 18)
@@ -362,7 +359,7 @@ Rectangle {
                     var offsetY = 65 * Math.sin(angle * Math.PI / 180);
                     var newBall = ball.createObject(world);
                     newBall.x = 125 + offsetX;
-                    newBall.y = 505 - offsetY;
+                    newBall.y = 500 - offsetY;
                     var impulse = power.value;
                     var impulseX = impulse * Math.cos(angle * Math.PI / 180);
                     var impulseY = impulse * Math.sin(angle * Math.PI / 180);
@@ -374,13 +371,13 @@ Rectangle {
 
         Slider {
             id: power
-            minimumValue: 1
-            maximumValue: 100
-            value: 50
+            minimumValue: 0.01
+            maximumValue: 5
+            value: 3
             width: 200
-            height: 50
+            height: 30
             x: 230
-            y: 90
+            y: 100
         }
 
         DebugDraw {
